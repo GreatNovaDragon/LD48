@@ -11,7 +11,7 @@
                     "id": "e535a00d-3a44-43ff-b974-cd1bca6f5a11",
                     "expectedControlType": "Button",
                     "processors": "",
-                    "interactions": "Hold"
+                    "interactions": ""
                 },
                 {
                     "name": "Fire",

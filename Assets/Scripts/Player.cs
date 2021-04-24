@@ -2,98 +2,99 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Tilemaps;
 
 public class Player : MonoBehaviour
 {
 
 
-    public enum e_jump
-    {
-        up, peak, down
-    }
-    public e_jump jumpStatus;
     private Rigidbody2D body;
+
+    public enum JumpState
+    { up, flight, landed }
+    public JumpState jumpstate;
     Stats stats;
-    private IEnumerator jumpRoutine;
+    Vector2 wanted_velocity;
+    public GameObject tilemapGameObject;
+    Tilemap tilemap;
+    bool jump;
 
-    private Transform transform_p;
-    float x = 0;
-    bool is_jumpin = false;
-
+    bool is_grounded;
+    IEnumerator jump_couroutine;
 
     public void Walk(InputAction.CallbackContext context)
     {
-        x = context.ReadValue<Vector2>().x * stats.speed;
-
+        wanted_velocity.x = context.ReadValue<Vector2>().x * stats.speed;
     }
 
     public void Jump(InputAction.CallbackContext context)
     {
-        if (!is_jumpin)
-        {
-            is_jumpin = true;
-
-            jumpRoutine = JumpEnum();
-            StartCoroutine(jumpRoutine);
+        if (is_grounded)
+        {       jump_couroutine = JumpRoutine();
+                StartCoroutine(jump_couroutine);
         }
     }
-
     void Start()
     {
         body = GetComponent<Rigidbody2D>();
         stats = GetComponent<Stats>();
-        transform_p = GetComponent<Transform>();
-        jumpStatus = e_jump.down;
+        if (tilemapGameObject != null)
+        {
+            tilemap = tilemapGameObject.GetComponent<Tilemap>();
+        }
+        is_grounded = true;
+        wanted_velocity = new Vector2(0, 0);
     }
 
     // Update is called once per frame
     void Update()
     {
-        float y = 0;
-        switch (jumpStatus)
+
+        switch (jumpstate)
         {
-            case e_jump.up:
-                y = stats.speed;
+            case JumpState.up:
+                wanted_velocity.y = stats.MaxJump;
+                is_grounded=false;
                 break;
-            case e_jump.down:
-                y = -stats.speed;
+            case JumpState.flight:
+                wanted_velocity.y = stats.MaxJump * -1;
                 break;
-            case e_jump.peak:
-                y = 0;
+            case JumpState.landed:
+                wanted_velocity.y = 0;
                 break;
         }
-
-        body.velocity = new Vector2(x, y);
-
+        Debug.Log(wanted_velocity);
+        body.velocity = wanted_velocity;
     }
-    void FixedUpdate()
+IEnumerator JumpRoutine()
     {
+        jumpstate=JumpState.up;
 
-    }
-    IEnumerator JumpEnum()
-    {
-        jumpStatus = e_jump.up;
-        yield return new WaitForSeconds((float)0.2);
-        jumpStatus = e_jump.peak;
-        body.gravityScale = 0;
-        yield return new WaitForSeconds(0);
-        body.gravityScale = 1;
-        jumpStatus = e_jump.down;
+
+        //yield on a new YieldInstruction that waits for 5 seconds.
+        yield return new WaitForSeconds((float)0.5);
+        jumpstate=JumpState.flight;
+
+        //After we have waited 5 seconds print the time again.
+        Debug.Log("Finished Coroutine at timestamp : " + Time.time);
     }
 
-    void OnColissionStay2D(Collision2D colission)
+
+    void OnCollisionEnter2D(Collision2D collision)
     {
-        Transform collider = colission.collider.GetComponent<Transform>();
-        Debug.Log(is_jumpin + " " +collider.position.y );
-        if (is_jumpin&&collider.position.y<transform_p.position.x)
+        Vector3 hitPosition = Vector3.zero;
+        if (tilemap != null && tilemapGameObject == collision.gameObject)
         {
-            StopCoroutine(jumpRoutine);
-            jumpStatus = e_jump.down;
-
-            is_jumpin = false;
+            foreach (ContactPoint2D hit in collision.contacts)
+            {
+                hitPosition.x = hit.point.x - 0.01f * hit.normal.x;
+                hitPosition.y = hit.point.y - 0.01f * hit.normal.y;
+                TileData e = tilemap.GetTile<TileData>(tilemap.WorldToCell(hitPosition));
+                if (e.TileType == TileData.e_TileType.Ground)
+                { is_grounded = true; 
+                jumpstate=JumpState.landed;}
+            }
         }
-
-
     }
-
 }
+
